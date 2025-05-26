@@ -6,7 +6,7 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import zipfile
 import io
-from analysis import analyze_delivery_performance_comprehensive
+from analysis import analyze_comprehensive_delivery_performance_corrected
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-fallback-secret-key')  # Change this in production
@@ -89,7 +89,7 @@ def analyze(filename):
         
         # Run the analysis
         flash('Analysis in progress... This may take a few minutes.')
-        results = analyze_delivery_performance_comprehensive(filepath)
+        results = analyze_comprehensive_delivery_performance_corrected(filepath)
         
         if results is None:
             flash('Analysis failed. Please check your data format.')
