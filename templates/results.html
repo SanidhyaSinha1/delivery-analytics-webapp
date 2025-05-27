@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title">📊 Analysis Results</h3>
+                <div>
+                    <a href="{{ url_for('download_all_files', base_filename=filename) }}" class="btn btn-success">
+                        📥 Download All CSV Files
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        🔄 Analyze New File
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                
+                <!-- Day-wise Analysis -->
+                {% if analysis_data.daywise %}
+                <div class="mb-5">
+                    <h4>📈 Day-wise Performance Analysis</h4>
+                    <p class="text-muted">Delivery performance degradation by days after TAT breach</p>
+                    <div class="table-responsive">
+                        {{ analysis_data.daywise|safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Payment Method Analysis -->
+                {% if analysis_data.payment %}
+                <div class="mb-5">
+                    <h4>💳 Payment Method Performance</h4>
+                    <p class="text-muted">COD vs PREPAID delivery performance comparison</p>
+                    <div class="table-responsive">
+                        {{ analysis_data.payment|safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Zone Performance Analysis -->
+                {% if analysis_data.zone %}
+                <div class="mb-5">
+                    <h4>🗺️ Geographic Zone Performance</h4>
+                    <p class="text-muted">Delivery performance by geographic zones</p>
+                    <div class="table-responsive">
+                        {{ analysis_data.zone|safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Courier Performance Analysis -->
+                {% if analysis_data.courier %}
+                <div class="mb-5">
+                    <h4>📦 Courier Performance Comparison</h4>
+                    <p class="text-muted">Parent courier performance analysis</p>
+                    <div class="table-responsive">
+                        {{ analysis_data.courier|safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Download Section -->
+                <div class="mt-5">
+                    <h4>📥 Download Individual Files</h4>
+                    <div class="row">
+                        {% for file in download_files %}
+                        <div class="col-md-6 col-lg-4 mb-2">
+                            <a href="{{ url_for('download_file', filename=file) }}" class="btn btn-outline-primary btn-sm w-100">
+                                📄 {{ file.replace(filename.replace('.csv', '') + '_', '').replace('.csv', '').replace('_', ' ').title() }}
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

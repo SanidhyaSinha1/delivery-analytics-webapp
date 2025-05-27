@@ -53,13 +53,13 @@ def upload_file():
     try:
         if 'file' not in request.files:
             flash('No file selected')
-            return redirect(request.url)
+            return redirect(url_for('index'))
         
         file = request.files['file']
         
         if file.filename == '':
             flash('No file selected')
-            return redirect(request.url)
+            return redirect(url_for('index'))
         
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
@@ -72,8 +72,7 @@ def upload_file():
             return redirect(url_for('analyze', filename=filename))
         else:
             flash('Please upload a CSV file only')
-            return redirect(request.url)
-    
+            return redirect(url_for('index'))
     except Exception as e:
         flash(f'Error uploading file: {str(e)}')
         return redirect(url_for('index'))
