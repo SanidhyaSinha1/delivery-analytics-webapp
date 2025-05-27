@@ -171,14 +171,29 @@ def generate_download_files(filename, results):
         return []
 
 def prepare_display_data(results):
-    """Prepare data for web display with memory optimization"""
+    """Prepare data for web display with summary statistics"""
     try:
         daywise_results, payment_results, zone_results, route_results, courier_results = results
         
         analysis_data = {}
         
-        # Process each result set efficiently
+        # Calculate summary statistics
         if daywise_results is not None and not daywise_results.empty:
+            total_breach_cases = daywise_results['total_shipments'].sum()
+            total_delivered = daywise_results['successful_deliveries'].sum()
+            total_rto = daywise_results['rto_count'].sum()
+            
+            # Calculate rates
+            delivery_rate = (total_delivered / total_breach_cases * 100) if total_breach_cases > 0 else 0
+            rto_rate = (total_rto / total_breach_cases * 100) if total_breach_cases > 0 else 0
+            
+            # Add summary stats to analysis_data
+            analysis_data['total_records'] = f"{total_breach_cases:,}"
+            analysis_data['breach_cases'] = f"{total_breach_cases:,}"
+            analysis_data['delivery_rate'] = f"{delivery_rate:.1f}%"
+            analysis_data['rto_rate'] = f"{rto_rate:.1f}%"
+            
+            # Process daywise data for display
             daywise_display = daywise_results.head(15).copy()
             daywise_display['delivery_percentage'] = daywise_display['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
             daywise_display['drop_in_delivery_percentage'] = daywise_display['drop_in_delivery_percentage'].apply(
@@ -186,7 +201,14 @@ def prepare_display_data(results):
             )
             analysis_data['daywise'] = daywise_display.to_html(classes='table table-striped', index=False)
             del daywise_display
+        else:
+            # Set default values when no data
+            analysis_data['total_records'] = "0"
+            analysis_data['breach_cases'] = "0"
+            analysis_data['delivery_rate'] = "0%"
+            analysis_data['rto_rate'] = "0%"
         
+        # Process payment method data
         if payment_results is not None and not payment_results.empty:
             payment_summary = payment_results.groupby('payment_method').agg({
                 'total_shipments': 'sum',
@@ -198,6 +220,7 @@ def prepare_display_data(results):
             analysis_data['payment'] = payment_summary.to_html(classes='table table-striped', index=False)
             del payment_summary
         
+        # Process zone data
         if zone_results is not None and not zone_results.empty:
             zone_summary = zone_results.groupby('applied_zone').agg({
                 'total_shipments': 'sum',
@@ -209,6 +232,7 @@ def prepare_display_data(results):
             analysis_data['zone'] = zone_summary.to_html(classes='table table-striped', index=False)
             del zone_summary
         
+        # Process courier data
         if courier_results is not None and not courier_results.empty:
             courier_summary = courier_results.groupby('parent_courier_name').agg({
                 'total_shipments': 'sum',
@@ -227,7 +251,14 @@ def prepare_display_data(results):
     
     except Exception as e:
         print(f"Error preparing display data: {e}")
-        return {}
+        # Return default values on error
+        return {
+            'total_records': "0",
+            'breach_cases': "0", 
+            'delivery_rate': "0%",
+            'rto_rate': "0%"
+        }
+
 
 @app.route('/download/<filename>')
 def download_file(filename):
