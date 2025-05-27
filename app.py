@@ -30,6 +30,17 @@ socket.setdefaulttimeout(1200)  # 20 minutes timeout
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+# MongoDB configuration
+app.config['MONGODB_URI'] = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/delivery_analytics')
+
+# Azure Blob Storage configuration
+app.config['AZURE_STORAGE_CONNECTION_STRING'] = os.environ.get('AZURE_STORAGE_CONNECTION_STRING')
+app.config['AZURE_CONTAINER_NAME'] = os.environ.get('AZURE_CONTAINER_NAME', 'delivery-analytics-files')
+
+# Security settings
+app.config['WTF_CSRF_ENABLED'] = True
+app.config['WTF_CSRF_SECRET_KEY'] = os.environ.get('CSRF_SECRET_KEY', 'csrf-secret-key') 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
