@@ -235,6 +235,10 @@ def download_all_files(base_filename):
     except Exception as e:
         flash(f'Download error: {str(e)}')
         return redirect(url_for('index'))
+    
+@app.route('/health')
+def health():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
