@@ -6,6 +6,7 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import zipfile
 import io
+import socket
 from analysis import analyze_comprehensive_delivery_performance_corrected
 
 app = Flask(__name__)
@@ -16,9 +17,16 @@ UPLOAD_FOLDER = 'uploads'
 DOWNLOAD_FOLDER = 'downloads'
 ALLOWED_EXTENSIONS = {'csv'}
 
+# Set global socket timeout
+socket.setdefaulttimeout(600)  # 10 minutes
+
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
 app.config['DOWNLOAD_FOLDER'] = os.environ.get('DOWNLOAD_FOLDER', 'downloads')
 app.config['MAX_CONTENT_LENGTH'] = 150 * 1024 * 1024  # 150MB max file size 
+
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
+
 
 # MongoDB configuration
 app.config['MONGODB_URI'] = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/delivery_analytics')
@@ -257,4 +265,4 @@ def health():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, debug=False) 
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True) 
