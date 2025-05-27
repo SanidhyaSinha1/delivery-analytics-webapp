@@ -90,7 +90,7 @@ def analyze(filename):
         flash('Analysis in progress... This may take a few minutes.')
         results = analyze_comprehensive_delivery_performance_corrected(filepath)
         
-        if results is None:
+        if results is None or results[0] is None:
             flash('Analysis failed. Please check your data format.')
             return redirect(url_for('index'))
         
@@ -236,9 +236,24 @@ def download_all_files(base_filename):
         flash(f'Download error: {str(e)}')
         return redirect(url_for('index'))
     
+@app.errorhandler(413)
+def too_large(error):
+    flash('File too large! Please upload a file smaller than 150MB.')
+    return redirect(url_for('index'))
+
+@app.errorhandler(500)
+def internal_error(error):
+    flash('Internal server error. Please try again.')
+    return redirect(url_for('index'))
+    
 @app.route('/health')
 def health():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat(),
+        "max_file_size_mb": app.config['MAX_CONTENT_LENGTH'] / (1024 * 1024),
+        "max_file_size_bytes": app.config['MAX_CONTENT_LENGTH']
+    }
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
