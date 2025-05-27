@@ -101,7 +101,6 @@ def analyze(filename):
         # Force garbage collection before analysis
         gc.collect()
         
-        flash('Analysis in progress... Large files may take 10-15 minutes. Please wait...')
         
         # Run memory-optimized analysis
         results = analyze_comprehensive_delivery_performance_corrected(filepath)
