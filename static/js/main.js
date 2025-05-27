@@ -7,9 +7,9 @@ document.addEventListener('DOMContentLoaded', function() {
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                // Check file size (150MB limit)
-                if (file.size > 150 * 1024 * 1024) {
-                    alert('File size must be less than 150MB');
+                // Check file size (50MB limit)
+                if (file.size > 50 * 1024 * 1024) {
+                    alert('File size must be less than 50MB');
                     e.target.value = '';
                     return;
                 }

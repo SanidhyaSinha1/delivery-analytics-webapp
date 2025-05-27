@@ -19,7 +19,7 @@ ALLOWED_EXTENSIONS = {'csv'}
 
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
 app.config['DOWNLOAD_FOLDER'] = os.environ.get('DOWNLOAD_FOLDER', 'downloads')
-app.config['MAX_CONTENT_LENGTH'] = 150 * 1024 * 1024  # 150MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 # Memory optimization settings
@@ -269,7 +269,7 @@ def download_all_files(base_filename):
 
 @app.errorhandler(413)
 def too_large(error):
-    flash('File too large! Please upload a file smaller than 150MB.')
+    flash('File too large! Please upload a file smaller than 50MB.')
     return redirect(url_for('index'))
 
 @app.errorhandler(500)
@@ -288,5 +288,5 @@ def health():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
-    print(f"Starting Flask app with 150MB limit and memory optimization")
+    print(f"Starting Flask app with 50MB limit and memory optimization")
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
