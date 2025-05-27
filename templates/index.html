@@ -1,63 +1,111 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">📈 Delivery Performance Analysis</h3>
-            </div>
-            <div class="card-body">
-                <p class="lead">Upload your delivery data CSV file to get comprehensive performance analytics including:</p>
-                <ul class="list-group list-group-flush mb-4">
-                    <li class="list-group-item">📊 Day-wise delivery performance after TAT breach</li>
-                    <li class="list-group-item">💳 Payment method impact analysis</li>
-                    <li class="list-group-item">🗺️ Geographic zone performance</li>
-                    <li class="list-group-item">🛣️ Route performance analysis</li>
-                    <li class="list-group-item">📦 Courier performance comparison</li>
-                    <li class="list-group-item">🔄 RTO analysis and insights</li>
-                </ul>
+<div class="container-fluid">
+    <!-- Hero Section -->
+    <div class="row mb-5">
+        <div class="col-12 text-center">
+            <h1 class="display-4 text-white mb-3">
+                📊 <span class="text-gradient">Delivery Performance Analytics</span>
+            </h1>
+            <p class="lead text-white opacity-75">
+                Transform your delivery data into actionable insights with comprehensive analytics
+            </p>
+        </div>
+    </div>
 
-                <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="file" class="form-label">Select CSV File</label>
-                        <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
-                        <div class="form-text">Maximum file size: 50MB. Only CSV files are accepted.</div>
-                    </div>
-                    
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            🚀 Analyze Data
-                        </button>
-                    </div>
-                </form>
-
-                <div class="mt-4">
-                    <h5>📋 Required CSV Columns:</h5>
-                    <div class="row">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-7">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        🚀 Upload Your Data
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <!-- Features Overview -->
+                    <div class="row mb-4">
                         <div class="col-md-6">
-                            <small class="text-muted">
-                                • parent_courier_name<br>
-                                • courier_name<br>
-                                • payment_method<br>
-                                • first_attempt_date<br>
-                                • final_courier_edd<br>
-                                • delivered_date<br>
-                                • rapidshyp_edd<br>
-                                • tracking_status_group
-                            </small>
+                            <h5 class="mb-3">📈 What You'll Get:</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">Day-wise delivery performance after TAT breach</li>
+                                <li class="list-group-item">Payment method impact analysis</li>
+                                <li class="list-group-item">Geographic zone performance</li>
+                            </ul>
                         </div>
                         <div class="col-md-6">
-                            <small class="text-muted">
-                                • applied_zone<br>
-                                • pickup_state<br>
-                                • delivery_state<br>
-                                • delivery_city<br>
-                                • company_name<br>
-                                • shipment_mode<br>
-                                • pickup_pincode<br>
-                                • delivery_pincode
-                            </small>
+                            <h5 class="mb-3">🎯 Advanced Analytics:</h5>
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item">Route performance analysis</li>
+                                <li class="list-group-item">Courier performance comparison</li>
+                                <li class="list-group-item">RTO analysis and insights</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Upload Form -->
+                    <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm">
+                        <div class="mb-4">
+                            <label for="file" class="form-label">
+                                📁 Select Your CSV File
+                            </label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                            <div class="form-text">
+                                <strong>Maximum file size:</strong> 50MB | <strong>Format:</strong> CSV only
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid mb-4">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                🚀 Analyze Data
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- File Info -->
+                    <div id="fileInfo" class="alert alert-info d-none">
+                        <h6 class="alert-heading">📋 File Information</h6>
+                        <div id="fileDetails"></div>
+                    </div>
+
+                    <!-- Required Columns -->
+                    <div class="mt-4">
+                        <h5 class="mb-3">📋 Required CSV Columns</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card glass-effect">
+                                    <div class="card-body p-3">
+                                        <h6 class="card-title">🚚 Delivery Data</h6>
+                                        <small class="text-muted d-block">
+                                            • parent_courier_name<br>
+                                            • courier_name<br>
+                                            • payment_method<br>
+                                            • first_attempt_date<br>
+                                            • final_courier_edd<br>
+                                            • delivered_date<br>
+                                            • rapidshyp_edd<br>
+                                            • tracking_status_group
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card glass-effect">
+                                    <div class="card-body p-3">
+                                        <h6 class="card-title">🗺️ Geographic Data</h6>
+                                        <small class="text-muted d-block">
+                                            • applied_zone<br>
+                                            • pickup_state<br>
+                                            • delivery_state<br>
+                                            • delivery_city<br>
+                                            • company_name<br>
+                                            • shipment_mode<br>
+                                            • pickup_pincode<br>
+                                            • delivery_pincode
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
