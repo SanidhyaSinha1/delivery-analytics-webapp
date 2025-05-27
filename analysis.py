@@ -10,6 +10,44 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
     
     # Load the dataset
     print("📊 Loading dataset...")
+    
+    # Read in chunks to reduce memory usage
+    chunk_size = 10000  # Process 10k rows at a time
+    chunks = []
+    
+    try:
+        for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+            # Process each chunk
+            chunks.append(chunk)
+            print(f"Processed chunk of {len(chunk)} rows")
+        
+        # Combine chunks
+        df = pd.concat(chunks, ignore_index=True)
+        print(f"✅ Dataset loaded with {len(df):,} records")
+        
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None, None
+    
+    # Read with optimized data types
+    dtype_dict = {
+        'parent_courier_name': 'category',
+        'payment_method': 'category', 
+        'tracking_status_group': 'category',
+        'applied_zone': 'category',
+        'pickup_state': 'category',
+        'delivery_state': 'category'
+    }
+    
+    df = pd.read_csv(file_path, dtype=dtype_dict, low_memory=False)
+    print(f"✅ Dataset loaded with {len(df):,} records")
+    
+    # Convert date columns efficiently
+    date_columns = ['first_attempt_date', 'final_courier_edd', 'delivered_date', 'rapidshyp_edd']
+    for col in date_columns:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+    
     df = pd.read_csv(file_path)
     print(f"✅ Dataset loaded with {len(df):,} records")
     
