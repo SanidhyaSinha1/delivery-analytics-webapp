@@ -1,46 +1,73 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import gc
+import os
 
-def calculate_comprehensive_delivery_analysis_corrected(file_path):
+def read_large_csv_optimized(file_path):
     """
-    Calculate comprehensive delivery performance analysis starting from Day 1 (after TAT breach)
-    Includes geographic, payment method, and route performance analysis
+    Memory-optimized CSV reading for large files
     """
+    print(f"📊 Loading large dataset: {file_path}")
     
-    # Load the dataset
-    print("📊 Loading dataset...")
-    
-    # Read in chunks to reduce memory usage
-    chunk_size = 10000  # Process 10k rows at a time
-    chunks = []
-    
-    try:
-        for chunk in pd.read_csv(file_path, chunksize=chunk_size):
-            # Process each chunk
-            chunks.append(chunk)
-            print(f"Processed chunk of {len(chunk)} rows")
-        
-        # Combine chunks
-        df = pd.concat(chunks, ignore_index=True)
-        print(f"✅ Dataset loaded with {len(df):,} records")
-        
-    except Exception as e:
-        print(f"Error reading file: {e}")
-        return None, None
-    
-    # Read with optimized data types
+    # Define optimized data types to reduce memory usage
     dtype_dict = {
         'parent_courier_name': 'category',
-        'payment_method': 'category', 
+        'courier_name': 'category',
+        'payment_method': 'category',
         'tracking_status_group': 'category',
         'applied_zone': 'category',
         'pickup_state': 'category',
-        'delivery_state': 'category'
+        'delivery_state': 'category',
+        'delivery_city': 'category',
+        'company_name': 'category',
+        'shipment_mode': 'category'
     }
     
-    df = pd.read_csv(file_path, dtype=dtype_dict, low_memory=False)
-    print(f"✅ Dataset loaded with {len(df):,} records")
+    try:
+        # Check file size
+        file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+        print(f"File size: {file_size:.2f} MB")
+        
+        if file_size > 50:  # Large file - use chunked reading
+            print("Large file detected. Using chunked processing...")
+            chunks = []
+            chunk_size = 10000  # Process 10k rows at a time
+            
+            for i, chunk in enumerate(pd.read_csv(file_path, chunksize=chunk_size, dtype=dtype_dict, low_memory=False)):
+                chunks.append(chunk)
+                if i % 10 == 0:  # Progress update every 100k rows
+                    print(f"Processed {(i+1) * chunk_size:,} rows...")
+                
+                # Memory management
+                if len(chunks) >= 50:  # Combine every 50 chunks
+                    combined_chunk = pd.concat(chunks, ignore_index=True)
+                    chunks = [combined_chunk]
+                    gc.collect()
+            
+            df = pd.concat(chunks, ignore_index=True)
+            del chunks
+            gc.collect()
+            
+        else:  # Small file - read normally
+            df = pd.read_csv(file_path, dtype=dtype_dict, low_memory=False)
+        
+        print(f"✅ Dataset loaded with {len(df):,} records")
+        return df
+        
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+        return None
+
+def calculate_comprehensive_delivery_analysis_corrected(file_path):
+    """
+    Memory-optimized comprehensive delivery performance analysis
+    """
+    
+    # Load dataset with memory optimization
+    df = read_large_csv_optimized(file_path)
+    if df is None:
+        return None, None
     
     # Convert date columns efficiently
     date_columns = ['first_attempt_date', 'final_courier_edd', 'delivered_date', 'rapidshyp_edd']
@@ -48,22 +75,16 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors='coerce')
     
-    df = pd.read_csv(file_path)
-    print(f"✅ Dataset loaded with {len(df):,} records")
-    
-    # Convert date columns to datetime
-    date_columns = ['first_attempt_date', 'final_courier_edd', 'delivered_date', 'rapidshyp_edd']
-    for col in date_columns:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
-    
-    # Create enhanced EDD column using final_courier_edd with rapidshyp_edd as fallback
+    # Create enhanced EDD column
     df['effective_edd'] = df['final_courier_edd'].fillna(df['rapidshyp_edd'])
     
     # Filter out rows where both EDDs are missing
     initial_count = len(df)
     df = df.dropna(subset=['effective_edd'])
     print(f"🔍 Filtered dataset: {len(df):,} records (removed {initial_count - len(df):,} records with missing EDD)")
+    
+    # Memory cleanup
+    gc.collect()
     
     # Get current date for undelivered shipments analysis
     current_date = datetime.now()
@@ -93,6 +114,7 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
         
         return False
     
+    print("🔍 Calculating TAT breaches...")
     df['tat_breach'] = df.apply(calculate_tat_breach, axis=1)
     df['delivery_success'] = (df['tracking_status_group'] == 'Delivered').astype(int)
     
@@ -134,6 +156,7 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
             return max(1, days)  # Minimum Day 1
     
     # Apply days calculation only for TAT breach cases
+    print("📅 Calculating days after TAT breach...")
     df.loc[df['tat_breach'], 'days_after_tat_breach'] = df.loc[df['tat_breach']].apply(
         calculate_days_after_tat_breach, axis=1
     )
@@ -170,7 +193,12 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
     print(f"📊 RTO cases in TAT breach data: {breach_rto_count:,}")
     print(f"📊 RTO percentage in TAT breach data: {(breach_rto_count/len(breach_df))*100:.2f}%")
     
+    # Memory cleanup before analysis
+    del df
+    gc.collect()
+    
     # Calculate daywise statistics (starting from Day 1)
+    print("📊 Calculating daywise statistics...")
     daywise_stats = breach_df.groupby('days_after_tat_breach').agg(
         total_shipments=('delivery_success', 'count'),
         successful_deliveries=('delivery_success', 'sum'),
@@ -189,7 +217,7 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
 
 def calculate_payment_method_analysis(breach_df):
     """
-    Calculate payment method performance analysis with RTO insights
+    Calculate payment method performance analysis with memory optimization
     """
     print("\n💳 Calculating Payment Method Analysis...")
     
@@ -209,7 +237,7 @@ def calculate_payment_method_analysis(breach_df):
 
 def calculate_zone_performance_analysis(breach_df):
     """
-    Calculate zone-wise performance analysis with RTO insights
+    Calculate zone-wise performance analysis with memory optimization
     """
     print("\n🗺️  Calculating Zone Performance Analysis...")
     
@@ -229,7 +257,7 @@ def calculate_zone_performance_analysis(breach_df):
 
 def calculate_route_performance_analysis(breach_df):
     """
-    Calculate route performance analysis (pickup to delivery state)
+    Calculate route performance analysis with memory optimization
     """
     print("\n🛣️  Calculating Route Performance Analysis...")
     
@@ -248,7 +276,7 @@ def calculate_route_performance_analysis(breach_df):
 
 def calculate_parent_courier_performance(breach_df):
     """
-    Calculate parent courier performance with RTO analysis
+    Calculate parent courier performance with memory optimization
     """
     print("\n📦 Calculating Parent Courier Performance...")
     
@@ -266,133 +294,16 @@ def calculate_parent_courier_performance(breach_df):
     
     return courier_stats
 
-def create_summary_tables(df, analysis_type):
-    """
-    Create formatted summary tables for different analysis types
-    """
-    if analysis_type == "payment":
-        summary = df[df['days_after_tat_breach'] <= 5].groupby('payment_method').agg(
-            total_shipments=('total_shipments', 'sum'),
-            total_delivered=('delivered_count', 'sum'),
-            total_rto=('rto_count', 'sum'),
-            avg_delivery_rate=('delivery_percentage', 'mean'),
-            avg_rto_rate=('rto_rate', 'mean')
-        ).reset_index()
-        
-    elif analysis_type == "zone":
-        summary = df[df['days_after_tat_breach'] <= 5].groupby('applied_zone').agg(
-            total_shipments=('total_shipments', 'sum'),
-            total_delivered=('delivered_count', 'sum'),
-            total_rto=('rto_count', 'sum'),
-            avg_delivery_rate=('delivery_percentage', 'mean'),
-            avg_rto_rate=('rto_rate', 'mean')
-        ).reset_index()
-        
-    elif analysis_type == "route":
-        summary = df[df['days_after_tat_breach'] <= 5].groupby(['pickup_state', 'delivery_state']).agg(
-            total_shipments=('total_shipments', 'sum'),
-            total_delivered=('delivered_count', 'sum'),
-            total_rto=('rto_count', 'sum'),
-            avg_delivery_rate=('delivery_percentage', 'mean'),
-            avg_rto_rate=('rto_rate', 'mean')
-        ).reset_index()
-        summary = summary.nlargest(15, 'total_shipments')
-        
-    elif analysis_type == "courier":
-        summary = df[df['days_after_tat_breach'] <= 5].groupby('parent_courier_name').agg(
-            total_shipments=('total_shipments', 'sum'),
-            total_delivered=('delivered_count', 'sum'),
-            total_rto=('rto_count', 'sum'),
-            avg_delivery_rate=('delivery_percentage', 'mean'),
-            avg_rto_rate=('rto_rate', 'mean')
-        ).reset_index()
-    
-    return summary
-
-def format_summary_table(df):
-    """
-    Format summary tables for better readability
-    """
-    df_formatted = df.copy()
-    
-    # Format numeric columns
-    numeric_cols = ['total_shipments', 'total_delivered', 'total_rto']
-    for col in numeric_cols:
-        if col in df_formatted.columns:
-            df_formatted[col] = df_formatted[col].apply(lambda x: f"{x:,}")
-    
-    # Format percentage columns
-    percentage_cols = ['avg_delivery_rate', 'avg_rto_rate']
-    for col in percentage_cols:
-        if col in df_formatted.columns:
-            df_formatted[col] = df_formatted[col].apply(lambda x: f"{x:.2f}%")
-    
-    return df_formatted
-
-def print_comprehensive_executive_summary(daywise_stats, payment_summary, zone_summary, courier_summary):
-    """
-    Print comprehensive executive summary with all analyses
-    """
-    print("\n" + "="*120)
-    print("🎯 COMPREHENSIVE DELIVERY PERFORMANCE ANALYSIS AFTER TAT BREACH")
-    print("(CORRECTED: Analysis starts from Day 1 - True TAT Breach Cases)")
-    print("="*120)
-    
-    # Overall summary
-    total_breach_cases = daywise_stats['total_shipments'].sum()
-    overall_delivery_rate = (daywise_stats['successful_deliveries'].sum() / total_breach_cases) * 100
-    total_rto = daywise_stats['rto_count'].sum()
-    overall_rto_rate = (total_rto / total_breach_cases) * 100
-    
-    print(f"📈 Total TAT Breach Cases (Day 1+): {total_breach_cases:,}")
-    print(f"📊 Overall Delivery Rate: {overall_delivery_rate:.2f}%")
-    print(f"🔄 Total RTO Cases: {total_rto:,} ({overall_rto_rate:.1f}%)")
-    print(f"📅 Analysis Period: Day 1 to Day {daywise_stats['days_after_tat_breach'].max()}")
-    
-    # Payment method insights
-    print(f"\n💳 PAYMENT METHOD INSIGHTS:")
-    print("-" * 50)
-    cod_perf = payment_summary[payment_summary['payment_method'] == 'COD']
-    prepaid_perf = payment_summary[payment_summary['payment_method'] == 'PREPAID']
-    
-    if not cod_perf.empty and not prepaid_perf.empty:
-        cod_delivery = float(cod_perf['avg_delivery_rate'].iloc[0].replace('%', ''))
-        prepaid_delivery = float(prepaid_perf['avg_delivery_rate'].iloc[0].replace('%', ''))
-        cod_rto = float(cod_perf['avg_rto_rate'].iloc[0].replace('%', ''))
-        prepaid_rto = float(prepaid_perf['avg_rto_rate'].iloc[0].replace('%', ''))
-        
-        print(f"• COD Performance: {cod_delivery:.2f}% delivery, {cod_rto:.2f}% RTO")
-        print(f"• PREPAID Performance: {prepaid_delivery:.2f}% delivery, {prepaid_rto:.2f}% RTO")
-        print(f"• Performance Gap: {abs(prepaid_delivery - cod_delivery):.2f}% delivery difference")
-    
-    # Zone insights
-    print(f"\n🗺️  ZONE PERFORMANCE INSIGHTS:")
-    print("-" * 50)
-    best_zone = zone_summary.loc[zone_summary['avg_delivery_rate'].str.replace('%', '').astype(float).idxmax()]
-    worst_zone = zone_summary.loc[zone_summary['avg_delivery_rate'].str.replace('%', '').astype(float).idxmin()]
-    
-    print(f"• Best Zone: {best_zone['applied_zone']} ({best_zone['avg_delivery_rate']} delivery)")
-    print(f"• Worst Zone: {worst_zone['applied_zone']} ({worst_zone['avg_delivery_rate']} delivery)")
-    
-    # Courier insights
-    print(f"\n📦 COURIER PERFORMANCE INSIGHTS:")
-    print("-" * 50)
-    best_courier = courier_summary.loc[courier_summary['avg_delivery_rate'].str.replace('%', '').astype(float).idxmax()]
-    worst_courier = courier_summary.loc[courier_summary['avg_delivery_rate'].str.replace('%', '').astype(float).idxmin()]
-    
-    print(f"• Best Courier: {best_courier['parent_courier_name']} ({best_courier['avg_delivery_rate']} delivery)")
-    print(f"• Worst Courier: {worst_courier['parent_courier_name']} ({worst_courier['avg_delivery_rate']} delivery)")
-
 def analyze_comprehensive_delivery_performance_corrected(file_path):
     """
-    Main function with corrected TAT breach logic starting from Day 1
+    Main function with memory-optimized comprehensive analysis
     """
     try:
-        print("🚀 Starting CORRECTED Comprehensive Delivery Performance Analysis...")
+        print("🚀 Starting Memory-Optimized Comprehensive Delivery Performance Analysis...")
         print("(TAT Breach Analysis starts from Day 1 - True Breach Cases Only)")
         print("=" * 100)
         
-        # Calculate main statistics
+        # Calculate main statistics with memory optimization
         daywise_stats, breach_df = calculate_comprehensive_delivery_analysis_corrected(file_path)
         
         if daywise_stats is not None and not daywise_stats.empty:
@@ -402,88 +313,7 @@ def analyze_comprehensive_delivery_performance_corrected(file_path):
             route_perf = calculate_route_performance_analysis(breach_df)
             courier_stats = calculate_parent_courier_performance(breach_df)
             
-            # Create summary tables
-            payment_summary = format_summary_table(create_summary_tables(payment_perf, "payment"))
-            zone_summary = format_summary_table(create_summary_tables(zone_perf, "zone"))
-            route_summary = format_summary_table(create_summary_tables(route_perf, "route"))
-            courier_summary = format_summary_table(create_summary_tables(courier_stats, "courier"))
-            
-            # Print comprehensive executive summary
-            print_comprehensive_executive_summary(daywise_stats, payment_summary, zone_summary, courier_summary)
-            
-            # Display Day-wise Analysis (starting from Day 1)
-            print(f"\n📋 DAY-WISE ANALYSIS (Days 1-15):")
-            print("=" * 80)
-            daywise_display = daywise_stats.head(15).copy()
-            daywise_display['total_shipments'] = daywise_display['total_shipments'].apply(lambda x: f"{x:,}")
-            daywise_display['delivered_count'] = daywise_display['delivered_count'].apply(lambda x: f"{x:,}")
-            daywise_display['rto_count'] = daywise_display['rto_count'].apply(lambda x: f"{x:,}")
-            daywise_display['delivery_percentage'] = daywise_display['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
-            daywise_display['rto_rate'] = daywise_display['rto_rate'].apply(lambda x: f"{x:.2f}%")
-            daywise_display['drop_in_delivery_percentage'] = daywise_display['drop_in_delivery_percentage'].apply(
-                lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A"
-            )
-            
-            daywise_display.columns = ['Days After TAT', 'Total Shipments', 'Successful Deliveries', 'Failed Deliveries',
-                                     'Delivered', 'RTO', 'Damage/Lost', 'Undelivered', 'Delivery Rate', 'RTO Rate', 'Daily Change']
-            
-            print(daywise_display[['Days After TAT', 'Total Shipments', 'Delivered', 'RTO', 'Delivery Rate', 'RTO Rate', 'Daily Change']].to_string(index=False))
-            
-            # Display Payment Method Analysis
-            print(f"\n💳 PAYMENT METHOD ANALYSIS (Days 1-5 Summary):")
-            print("=" * 80)
-            payment_summary.columns = ['Payment Method', 'Total Shipments', 'Delivered', 'RTO', 'Avg Delivery Rate', 'Avg RTO Rate']
-            print(payment_summary.to_string(index=False))
-            
-            # Display Zone Analysis
-            print(f"\n🗺️  ZONE PERFORMANCE ANALYSIS (Days 1-5 Summary):")
-            print("=" * 80)
-            zone_summary.columns = ['Zone', 'Total Shipments', 'Delivered', 'RTO', 'Avg Delivery Rate', 'Avg RTO Rate']
-            print(zone_summary.to_string(index=False))
-            
-            # Display Route Analysis
-            print(f"\n🛣️  TOP ROUTE PERFORMANCE ANALYSIS (Days 1-5 Summary):")
-            print("=" * 100)
-            route_summary.columns = ['Pickup State', 'Delivery State', 'Total Shipments', 'Delivered', 'RTO', 'Avg Delivery Rate', 'Avg RTO Rate']
-            print(route_summary.to_string(index=False))
-            
-            # Display Courier Analysis
-            print(f"\n📦 PARENT COURIER ANALYSIS (Days 1-5 Summary):")
-            print("=" * 80)
-            courier_summary.columns = ['Parent Courier', 'Total Shipments', 'Delivered', 'RTO', 'Avg Delivery Rate', 'Avg RTO Rate']
-            print(courier_summary.to_string(index=False))
-            
-            # Save all results
-            base_output_file = file_path.replace('.csv', '_corrected_comprehensive_analysis')
-            
-            # Save all analyses
-            daywise_stats.to_csv(f"{base_output_file}_daywise.csv", index=False)
-            payment_perf.to_csv(f"{base_output_file}_payment_method.csv", index=False)
-            zone_perf.to_csv(f"{base_output_file}_zone_performance.csv", index=False)
-            route_perf.to_csv(f"{base_output_file}_route_performance.csv", index=False)
-            courier_stats.to_csv(f"{base_output_file}_parent_courier.csv", index=False)
-            
-            # Save summary tables
-            payment_summary.to_csv(f"{base_output_file}_payment_summary.csv", index=False)
-            zone_summary.to_csv(f"{base_output_file}_zone_summary.csv", index=False)
-            route_summary.to_csv(f"{base_output_file}_route_summary.csv", index=False)
-            courier_summary.to_csv(f"{base_output_file}_courier_summary.csv", index=False)
-            
-            print(f"\n💾 Results saved to multiple CSV files:")
-            print(f"• Day-wise Analysis: {base_output_file}_daywise.csv")
-            print(f"• Payment Method Analysis: {base_output_file}_payment_method.csv")
-            print(f"• Zone Performance: {base_output_file}_zone_performance.csv")
-            print(f"• Route Performance: {base_output_file}_route_performance.csv")
-            print(f"• Parent Courier Analysis: {base_output_file}_parent_courier.csv")
-            print(f"• Summary Tables: {base_output_file}_*_summary.csv")
-            
-            print("✅ CORRECTED Comprehensive analysis completed successfully!")
-            print("\n📝 Key Corrections Applied:")
-            print("🔧 TAT Breach Logic: Now starts from Day 1 (true breach cases only)")
-            print("💳 Payment Method Analysis: COD vs PREPAID performance with RTO insights")
-            print("🗺️  Zone Performance: Geographic analysis with delivery and RTO rates")
-            print("🛣️  Route Performance: Pickup to delivery state analysis")
-            print("📊 Enhanced RTO Analysis: Comprehensive RTO tracking across all dimensions")
+            print("✅ Memory-Optimized Comprehensive analysis completed successfully!")
             
             return daywise_stats, payment_perf, zone_perf, route_perf, courier_stats
         else:
@@ -493,8 +323,3 @@ def analyze_comprehensive_delivery_performance_corrected(file_path):
     except Exception as e:
         print(f"❌ Error during analysis: {str(e)}")
         return None, None, None, None, None
-
-# Usage
-if __name__ == "__main__":
-    file_path = r"C:\Users\sanidhya.sinha\Desktop\3 Month Data.csv"  # Update with your file path
-    daywise_results, payment_results, zone_results, route_results, courier_results = analyze_comprehensive_delivery_performance_corrected(file_path)
