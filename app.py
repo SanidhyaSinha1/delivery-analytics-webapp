@@ -215,6 +215,7 @@ def prepare_display_data(results):
                 'rto_count': 'sum',
                 'delivery_percentage': 'mean'
             }).reset_index()
+            payment_summary['delivery_percentage'] = (payment_summary['delivered_count'] / payment_summary['total_shipments'] * 100)
             payment_summary['delivery_percentage'] = payment_summary['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
             analysis_data['payment'] = payment_summary.to_html(classes='table table-striped', index=False)
             del payment_summary
@@ -227,6 +228,7 @@ def prepare_display_data(results):
                 'rto_count': 'sum',
                 'delivery_percentage': 'mean'
             }).reset_index()
+            zone_summary['delivery_percentage'] = (zone_summary['delivered_count'] / zone_summary['total_shipments'] * 100)
             zone_summary['delivery_percentage'] = zone_summary['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
             analysis_data['zone'] = zone_summary.to_html(classes='table table-striped', index=False)
             del zone_summary
@@ -239,6 +241,7 @@ def prepare_display_data(results):
                 'rto_count': 'sum',
                 'delivery_percentage': 'mean'
             }).reset_index()
+            courier_summary['delivery_percentage'] = (courier_summary['delivered_count'] / courier_summary['total_shipments'] * 100)
             courier_summary['delivery_percentage'] = courier_summary['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
             analysis_data['courier'] = courier_summary.to_html(classes='table table-striped', index=False)
             del courier_summary
