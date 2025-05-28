@@ -229,7 +229,7 @@ def calculate_payment_method_analysis(breach_df):
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    payment_performance['delivery_percentage'] = (payment_performance['successful_deliveries'] / payment_performance['total_shipments']) * 100
+    payment_performance['delivery_percentage'] = (payment_performance['delivered_count'] / payment_performance['total_shipments']) * 100
     payment_performance['rto_rate'] = (payment_performance['rto_count'] / payment_performance['total_shipments']) * 100
     payment_performance['drop_in_delivery_percentage'] = payment_performance.groupby('payment_method')['delivery_percentage'].diff()
     
@@ -249,7 +249,7 @@ def calculate_zone_performance_analysis(breach_df):
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    zone_performance['delivery_percentage'] = (zone_performance['successful_deliveries'] / zone_performance['total_shipments']) * 100
+    zone_performance['delivery_percentage'] = (zone_performance['delivered_count'] / zone_performance['total_shipments']) * 100
     zone_performance['rto_rate'] = (zone_performance['rto_count'] / zone_performance['total_shipments']) * 100
     zone_performance['drop_in_delivery_percentage'] = zone_performance.groupby('applied_zone')['delivery_percentage'].diff()
     
@@ -257,22 +257,68 @@ def calculate_zone_performance_analysis(breach_df):
 
 def calculate_route_performance_analysis(breach_df):
     """
-    Calculate route performance analysis with memory optimization
+    Calculate route performance analysis with meaningful aggregations
     """
     print("\n🛣️  Calculating Route Performance Analysis...")
     
-    route_performance = breach_df.groupby(['pickup_state', 'delivery_state', 'days_after_tat_breach']).agg(
+    # Create route combinations (pickup_state -> delivery_state)
+    breach_df['route'] = breach_df['pickup_state'].astype(str) + ' → ' + breach_df['delivery_state'].astype(str)
+    
+    # Get overall route performance (not day-wise to avoid too much granularity)
+    route_summary = breach_df.groupby('route').agg(
         total_shipments=('delivery_success', 'count'),
         successful_deliveries=('delivery_success', 'sum'),
         delivered_count=('shipment_category', lambda x: sum(x == 'Delivered')),
         rto_count=('shipment_category', lambda x: sum(x == 'RTO')),
-        undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
+        undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered')),
+        avg_days_to_delivery=('days_after_tat_breach', lambda x: x[breach_df.loc[x.index, 'shipment_category'] == 'Delivered'].mean())
     ).reset_index()
     
-    route_performance['delivery_percentage'] = (route_performance['successful_deliveries'] / route_performance['total_shipments']) * 100
-    route_performance['rto_rate'] = (route_performance['rto_count'] / route_performance['total_shipments']) * 100
+    # Calculate performance metrics
+    route_summary['delivery_percentage'] = (route_summary['delivered_count'] / route_summary['total_shipments']) * 100
+    route_summary['rto_rate'] = (route_summary['rto_count'] / route_summary['total_shipments']) * 100
+    route_summary['undelivered_rate'] = (route_summary['undelivered_count'] / route_summary['total_shipments']) * 100
     
-    return route_performance
+    # Sort by total shipments to show most important routes first
+    route_summary = route_summary.sort_values('total_shipments', ascending=False)
+    
+    # Only keep routes with significant volume (top 20 or minimum 10 shipments)
+    route_summary = route_summary[
+        (route_summary['total_shipments'] >= 10) | 
+        (route_summary.index < 20)
+    ].reset_index(drop=True)
+    
+    # Add route performance categories
+    def categorize_route_performance(row):
+        delivery_rate = row['delivery_percentage']
+        if delivery_rate >= 80:
+            return 'Excellent'
+        elif delivery_rate >= 60:
+            return 'Good'
+        elif delivery_rate >= 40:
+            return 'Average'
+        else:
+            return 'Poor'
+    
+    route_summary['performance_category'] = route_summary.apply(categorize_route_performance, axis=1)
+    
+    # Separate pickup and delivery states for better analysis
+    route_summary[['pickup_state', 'delivery_state']] = route_summary['route'].str.split(' → ', expand=True)
+    
+    # Reorder columns for better readability
+    column_order = [
+        'route', 'pickup_state', 'delivery_state', 'total_shipments', 
+        'delivered_count', 'delivery_percentage', 'rto_count', 'rto_rate',
+        'undelivered_count', 'undelivered_rate', 'avg_days_to_delivery', 
+        'performance_category'
+    ]
+    
+    route_summary = route_summary[column_order]
+    
+    print(f"✅ Route analysis completed for {len(route_summary)} major routes")
+    
+    return route_summary
+
 
 def calculate_parent_courier_performance(breach_df):
     """
@@ -288,7 +334,7 @@ def calculate_parent_courier_performance(breach_df):
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    courier_stats['delivery_percentage'] = (courier_stats['successful_deliveries'] / courier_stats['total_shipments']) * 100
+    courier_stats['delivery_percentage'] = (courier_stats['delivered_count'] / courier_stats['total_shipments']) * 100
     courier_stats['rto_rate'] = (courier_stats['rto_count'] / courier_stats['total_shipments']) * 100
     courier_stats['drop_in_delivery_percentage'] = courier_stats.groupby('parent_courier_name')['delivery_percentage'].diff()
     
