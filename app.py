@@ -112,13 +112,13 @@ def analyze(filename):
             flash('Analysis failed. Please check your data format and ensure all required columns are present.')
             return redirect(url_for('index'))
         
-        daywise_results, payment_results, zone_results, route_results, courier_results = results
+        daywise_results, payment_results, zone_results, route_results, courier_results, initial_total_records = results
         
         # Generate download files
-        download_files = generate_download_files(filename, results)
+        download_files = generate_download_files(filename, (daywise_results, payment_results, zone_results, route_results, courier_results))
         
         # Prepare data for display
-        analysis_data = prepare_display_data(results)
+        analysis_data = prepare_display_data((daywise_results, payment_results, zone_results, route_results, courier_results), initial_total_records)
         
         # Clean up memory
         del results
@@ -169,7 +169,7 @@ def generate_download_files(filename, results):
         print(f"Error generating download files: {e}")
         return []
 
-def prepare_display_data(results):
+def prepare_display_data(results, initial_total_records):
     """Prepare data for web display with summary statistics"""
     try:
         daywise_results, payment_results, zone_results, route_results, courier_results = results
@@ -187,7 +187,7 @@ def prepare_display_data(results):
             rto_rate = (total_rto / total_breach_cases * 100) if total_breach_cases > 0 else 0
             
             # Add summary stats to analysis_data
-            analysis_data['total_records'] = f"{total_breach_cases:,}"
+            analysis_data['total_records'] = f"{initial_total_records:,}"
             analysis_data['breach_cases'] = f"{total_breach_cases:,}"
             analysis_data['delivery_rate'] = f"{delivery_rate:.1f}%"
             analysis_data['rto_rate'] = f"{rto_rate:.1f}%"
@@ -202,7 +202,7 @@ def prepare_display_data(results):
             del daywise_display
         else:
             # Set default values when no data
-            analysis_data['total_records'] = "0"
+            analysis_data['total_records'] = f"{initial_total_records:,}" if initial_total_records else "0"
             analysis_data['breach_cases'] = "0"
             analysis_data['delivery_rate'] = "0%"
             analysis_data['rto_rate'] = "0%"
@@ -255,7 +255,7 @@ def prepare_display_data(results):
         print(f"Error preparing display data: {e}")
         # Return default values on error
         return {
-            'total_records': "0",
+            'total_records': f"{initial_total_records:,}" if 'initial_total_records' in locals() else "0",
             'breach_cases': "0", 
             'delivery_rate': "0%",
             'rto_rate': "0%"

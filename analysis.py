@@ -67,7 +67,9 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
     # Load dataset with memory optimization
     df = read_large_csv_optimized(file_path)
     if df is None:
-        return None, None
+        return None, None, None 
+    
+    initial_total_records = len(df)
     
     # Convert date columns efficiently
     date_columns = ['first_attempt_date', 'final_courier_edd', 'delivered_date', 'rapidshyp_edd']
@@ -79,9 +81,9 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
     df['effective_edd'] = df['final_courier_edd'].fillna(df['rapidshyp_edd'])
     
     # Filter out rows where both EDDs are missing
-    initial_count = len(df)
+    
     df = df.dropna(subset=['effective_edd'])
-    print(f"🔍 Filtered dataset: {len(df):,} records (removed {initial_count - len(df):,} records with missing EDD)")
+    print(f"🔍 Filtered dataset: {len(df):,} records (removed {initial_total_records - len(df):,} records with missing EDD)")
     
     # Memory cleanup
     gc.collect()
@@ -213,7 +215,7 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
     daywise_stats['rto_rate'] = (daywise_stats['rto_count'] / daywise_stats['total_shipments']) * 100
     daywise_stats['drop_in_delivery_percentage'] = daywise_stats['delivery_percentage'].diff()
     
-    return daywise_stats, breach_df
+    return daywise_stats, breach_df, initial_total_records
 
 def calculate_payment_method_analysis(breach_df):
     """
@@ -350,7 +352,7 @@ def analyze_comprehensive_delivery_performance_corrected(file_path):
         print("=" * 100)
         
         # Calculate main statistics with memory optimization
-        daywise_stats, breach_df = calculate_comprehensive_delivery_analysis_corrected(file_path)
+        daywise_stats, breach_df, initial_total_records = calculate_comprehensive_delivery_analysis_corrected(file_path)
         
         if daywise_stats is not None and not daywise_stats.empty:
             # Calculate all performance analyses
@@ -361,7 +363,7 @@ def analyze_comprehensive_delivery_performance_corrected(file_path):
             
             print("✅ Memory-Optimized Comprehensive analysis completed successfully!")
             
-            return daywise_stats, payment_perf, zone_perf, route_perf, courier_stats
+            return daywise_stats, payment_perf, zone_perf, route_perf, courier_stats, initial_total_records
         else:
             print("❌ No analysis could be performed due to insufficient data.")
             return None, None, None, None, None
