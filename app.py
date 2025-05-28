@@ -212,8 +212,7 @@ def prepare_display_data(results):
             payment_summary = payment_results.groupby('payment_method').agg({
                 'total_shipments': 'sum',
                 'delivered_count': 'sum',
-                'rto_count': 'sum',
-                'delivery_percentage': 'mean'
+                'rto_count': 'sum'
             }).reset_index()
             payment_summary['delivery_percentage'] = payment_summary['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
             analysis_data['payment'] = payment_summary.to_html(classes='table table-striped', index=False)
@@ -224,8 +223,7 @@ def prepare_display_data(results):
             zone_summary = zone_results.groupby('applied_zone').agg({
                 'total_shipments': 'sum',
                 'delivered_count': 'sum',
-                'rto_count': 'sum',
-                'delivery_percentage': 'mean'
+                'rto_count': 'sum'
             }).reset_index()
             zone_summary['delivery_percentage'] = zone_summary['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
             analysis_data['zone'] = zone_summary.to_html(classes='table table-striped', index=False)
@@ -236,8 +234,7 @@ def prepare_display_data(results):
             courier_summary = courier_results.groupby('parent_courier_name').agg({
                 'total_shipments': 'sum',
                 'delivered_count': 'sum',
-                'rto_count': 'sum',
-                'delivery_percentage': 'mean'
+                'rto_count': 'sum'
             }).reset_index()
             courier_summary['delivery_percentage'] = courier_summary['delivery_percentage'].apply(lambda x: f"{x:.2f}%")
             analysis_data['courier'] = courier_summary.to_html(classes='table table-striped', index=False)
