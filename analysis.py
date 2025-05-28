@@ -222,15 +222,15 @@ def calculate_payment_method_analysis(breach_df):
     print("\n💳 Calculating Payment Method Analysis...")
     
     payment_performance = breach_df.groupby(['payment_method', 'days_after_tat_breach']).agg(
-        total_shipments=('delivery_success', 'count'),
+        total_shipments1=('delivery_success', 'count'),
         successful_deliveries=('delivery_success', 'sum'),
         delivered_count=('shipment_category', lambda x: sum(x == 'Delivered')),
         rto_count=('shipment_category', lambda x: sum(x == 'RTO')),
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    payment_performance['delivery_percentage'] = (payment_performance['successful_deliveries'] / payment_performance['total_shipments']) * 100
-    payment_performance['rto_rate'] = (payment_performance['rto_count'] / payment_performance['total_shipments']) * 100
+    payment_performance['delivery_percentage'] = (payment_performance['successful_deliveries'] / payment_performance['total_shipments1']) * 100
+    payment_performance['rto_rate'] = (payment_performance['rto_count'] / payment_performance['total_shipments1']) * 100
     payment_performance['drop_in_delivery_percentage'] = payment_performance.groupby('payment_method')['delivery_percentage'].diff()
     
     return payment_performance
@@ -242,15 +242,15 @@ def calculate_zone_performance_analysis(breach_df):
     print("\n🗺️  Calculating Zone Performance Analysis...")
     
     zone_performance = breach_df.groupby(['applied_zone', 'days_after_tat_breach']).agg(
-        total_shipments=('delivery_success', 'count'),
+        total_shipments2=('delivery_success', 'count'),
         successful_deliveries=('delivery_success', 'sum'),
         delivered_count=('shipment_category', lambda x: sum(x == 'Delivered')),
         rto_count=('shipment_category', lambda x: sum(x == 'RTO')),
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    zone_performance['delivery_percentage'] = (zone_performance['successful_deliveries'] / zone_performance['total_shipments']) * 100
-    zone_performance['rto_rate'] = (zone_performance['rto_count'] / zone_performance['total_shipments']) * 100
+    zone_performance['delivery_percentage'] = (zone_performance['successful_deliveries'] / zone_performance['total_shipments2']) * 100
+    zone_performance['rto_rate'] = (zone_performance['rto_count'] / zone_performance['total_shipments2']) * 100
     zone_performance['drop_in_delivery_percentage'] = zone_performance.groupby('applied_zone')['delivery_percentage'].diff()
     
     return zone_performance
@@ -327,15 +327,15 @@ def calculate_parent_courier_performance(breach_df):
     print("\n📦 Calculating Parent Courier Performance...")
     
     courier_stats = breach_df.groupby(['parent_courier_name', 'days_after_tat_breach']).agg(
-        total_shipments=('delivery_success', 'count'),
+        total_shipments3=('delivery_success', 'count'),
         successful_deliveries=('delivery_success', 'sum'),
         delivered_count=('shipment_category', lambda x: sum(x == 'Delivered')),
         rto_count=('shipment_category', lambda x: sum(x == 'RTO')),
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    courier_stats['delivery_percentage'] = (courier_stats['delivered_count'] / courier_stats['total_shipments']) * 100
-    courier_stats['rto_rate'] = (courier_stats['rto_count'] / courier_stats['total_shipments']) * 100
+    courier_stats['delivery_percentage'] = (courier_stats['successful_deliveries'] / courier_stats['total_shipments3']) * 100
+    courier_stats['rto_rate'] = (courier_stats['rto_count'] / courier_stats['total_shipments3']) * 100
     courier_stats['drop_in_delivery_percentage'] = courier_stats.groupby('parent_courier_name')['delivery_percentage'].diff()
     
     return courier_stats
