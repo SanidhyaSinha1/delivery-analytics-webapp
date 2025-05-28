@@ -229,7 +229,7 @@ def calculate_payment_method_analysis(breach_df):
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    payment_performance['delivery_percentage'] = (payment_performance['delivered_count'] / payment_performance['total_shipments']) * 100
+    payment_performance['delivery_percentage'] = (payment_performance['successful_deliveries'] / payment_performance['total_shipments']) * 100
     payment_performance['rto_rate'] = (payment_performance['rto_count'] / payment_performance['total_shipments']) * 100
     payment_performance['drop_in_delivery_percentage'] = payment_performance.groupby('payment_method')['delivery_percentage'].diff()
     
@@ -249,7 +249,7 @@ def calculate_zone_performance_analysis(breach_df):
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    zone_performance['delivery_percentage'] = (zone_performance['delivered_count'] / zone_performance['total_shipments']) * 100
+    zone_performance['delivery_percentage'] = (zone_performance['successful_deliveries'] / zone_performance['total_shipments']) * 100
     zone_performance['rto_rate'] = (zone_performance['rto_count'] / zone_performance['total_shipments']) * 100
     zone_performance['drop_in_delivery_percentage'] = zone_performance.groupby('applied_zone')['delivery_percentage'].diff()
     
