@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.disabled = true;
             
             // Show processing message
-            showAlert('File uploaded successfully! Analysis in progress...', 'info');
+            showAlert('File uploaded successfully!', 'info');
         });
     }
     
