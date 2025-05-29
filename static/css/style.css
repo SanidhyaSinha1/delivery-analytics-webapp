@@ -1,7 +1,7 @@
 /* Modern Dashboard Styling */
 :root {
-    --primary-color: #2563eb;
-    --secondary-color: #64748b;
+    --primary-color: #3f1a50; /* 2563eb */
+    --secondary-color: #f7e263; /* 64748b */
     --success-color: #059669;
     --warning-color: #d97706;
     --danger-color: #dc2626;
