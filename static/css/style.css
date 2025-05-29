@@ -421,3 +421,20 @@ body {
         position: static;
     }
 }
+
+/* Logo Styling */
+.navbar-brand img {
+    transition: all 0.3s ease;
+}
+
+.navbar-brand:hover img {
+    transform: scale(1.1);
+}
+
+/* Responsive logo sizing */
+@media (max-width: 768px) {
+    .navbar-brand img {
+        height: 30px;
+        width: auto;
+    }
+}

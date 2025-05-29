@@ -17,12 +17,17 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                📊 Delivery Analytics
-            </a>
-        </div>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+            <img src="{{ url_for('static', filename='images/image-removebg-preview.png') }}" 
+                 alt="RapidShyp" 
+                 width="30" 
+                 height="24" 
+                 class="d-inline-block align-text-top">
+            Delivery Analytics
+        </a>
+    </div>
     </nav>
 
     <main class="py-4">
