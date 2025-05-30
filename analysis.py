@@ -77,7 +77,7 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors='coerce')
     
-    # Create enhanced EDD column
+    # Create enhanced EDD column 
     df['effective_edd'] = df['final_courier_edd'].fillna(df['rapidshyp_edd'])
     
     # Filter out rows where both EDDs are missing
@@ -100,7 +100,7 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
         
         # For delivered shipments, check if delivered AFTER EDD date (not on same date)
         if status == 'Delivered' and pd.notna(delivered):
-            return delivered.date() > effective_edd.date()
+            return first_attempt.date() > effective_edd.date()
         
         # For RTO/failed deliveries, check if first attempt was AFTER EDD date
         if status in ['RTO', 'Damage/Lost'] and pd.notna(first_attempt):
@@ -129,7 +129,7 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
         
         # For delivered shipments, use delivered_date
         if status == 'Delivered' and pd.notna(delivered):
-            days = (delivered.date() - effective_edd.date()).days
+            days = (first_attempt.date() - effective_edd.date()).days
             return max(1, days)  # Minimum Day 1
         
         # For RTO cases, use first_attempt_date
