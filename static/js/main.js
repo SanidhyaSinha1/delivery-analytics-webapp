@@ -118,33 +118,53 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function enhanceTables() {
-        // Add hover effects and sorting indicators to tables
-        const tables = document.querySelectorAll('.table');
-        tables.forEach(table => {
-            // Add zebra striping
-            table.classList.add('table-striped');
+    const tables = document.querySelectorAll('.table');
+    tables.forEach(table => {
+        table.classList.add('table-striped');
+        table.classList.add('table-hover');
+        
+        // Format all cells
+        const cells = table.querySelectorAll('td');
+        cells.forEach(cell => {
+            const text = cell.textContent.trim();
             
-            // Add hover effect
-            table.classList.add('table-hover');
-            
-            // Format percentage columns
-            const cells = table.querySelectorAll('td');
-            cells.forEach(cell => {
-                const text = cell.textContent.trim();
-                if (text.includes('%')) {
-                    const percentage = parseFloat(text);
-                    if (percentage >= 80) {
-                        cell.style.color = '#059669'; // Green for good performance
-                        cell.style.fontWeight = '600';
-                    } else if (percentage >= 60) {
-                        cell.style.color = '#d97706'; // Orange for average performance
-                        cell.style.fontWeight = '600';
-                    } else if (percentage < 60 && percentage > 0) {
-                        cell.style.color = '#dc2626'; // Red for poor performance
-                        cell.style.fontWeight = '600';
+            // Check if this is a percentage cell
+            if (text.includes('%')) {
+                const percentage = parseFloat(text);
+                
+                if (!isNaN(percentage)) {
+                    // Check if this cell contains "drop" data by looking at the column header
+                    const cellIndex = Array.from(cell.parentNode.children).indexOf(cell);
+                    const headerRow = table.querySelector('thead tr');
+                    const header = headerRow ? headerRow.children[cellIndex] : null;
+                    const headerText = header ? header.textContent.trim().toLowerCase() : '';
+                    
+                    if (headerText.includes('drop')) {
+                        // Handle drop_in_delivery_percentage column
+                        if (percentage > 0) {
+                            cell.style.color = '#059669'; // Green for positive
+                            cell.style.fontWeight = '600';
+                        } else if (percentage < 0) {
+                            cell.style.color = '#dc2626'; // Red for negative
+                            cell.style.fontWeight = '600';
+                        }
+                    } else {
+                        // Handle other percentage columns (delivery_percentage, rto_rate)
+                        if (percentage >= 80) {
+                            cell.style.color = '#059669'; // Green for good performance
+                            cell.style.fontWeight = '600';
+                        } else if (percentage >= 60) {
+                            cell.style.color = '#d97706'; // Orange for average performance
+                            cell.style.fontWeight = '600';
+                        } else if (percentage < 60 && percentage > 0) {
+                            cell.style.color = '#dc2626'; // Red for poor performance
+                            cell.style.fontWeight = '600';
+                        }
                     }
                 }
-            });
+            }
         });
-    }
+    });
+}
+
 });
