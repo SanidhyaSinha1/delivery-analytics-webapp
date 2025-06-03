@@ -63,71 +63,62 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
     """
     Memory-optimized comprehensive delivery performance analysis
     """
-
+    
     # Load dataset with memory optimization
     df = read_large_csv_optimized(file_path)
     if df is None:
-        return None, None, None
-
+        return None, None, None 
+    
     initial_total_records = len(df)
-
+    
     # Convert date columns efficiently
     date_columns = ['first_attempt_date', 'final_courier_edd', 'delivered_date', 'rapidshyp_edd']
     for col in date_columns:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors='coerce')
-
-    # Create enhanced EDD column
+    
+    # Create enhanced EDD column 
     df['effective_edd'] = df['final_courier_edd'].fillna(df['rapidshyp_edd'])
-
-    # DO NOT DROP ROWS WITH MISSING EDD!
-    # Instead, flag them for special handling
-    df['edd_missing'] = df['effective_edd'].isna()
-    print(f"🔍 Rows with missing EDD: {df['edd_missing'].sum()} (will be handled in TAT logic)")
-
+    
+    # Filter out rows where both EDDs are missing
+    
+    df = df.dropna(subset=['effective_edd'])
+    print(f"🔍 Filtered dataset: {len(df):,} records (removed {initial_total_records - len(df):,} records with missing EDD)")
+    
     # Memory cleanup
     gc.collect()
-
+    
     # Get current date for undelivered shipments analysis
     current_date = datetime.now()
-
-    # UPDATED TAT breach calculation to handle missing EDD
+    
+    # CORRECTED TAT breach calculation - only after EDD date, not on same date
     def calculate_tat_breach(row):
         effective_edd = row['effective_edd']
         first_attempt = row['first_attempt_date']
         delivered = row['delivered_date']
         status = row['tracking_status_group']
-
-        # If EDD is missing, treat as breach if first attempt exists or if current date is far ahead
-        if pd.isna(effective_edd):
-            # If first attempt exists, treat as breach (conservative)
-            if pd.notna(first_attempt):
-                return True
-            # If no attempt, treat as breach if current date is much later than order date (optional)
-            return True  # or use more nuanced logic if needed
-
-        # For delivered shipments, use first attempt date
-        if status == 'Delivered' and pd.notna(first_attempt):
+        
+        # For delivered shipments, check if delivered AFTER EDD date (not on same date)
+        if status == 'Delivered' and pd.notna(delivered):
             return first_attempt.date() > effective_edd.date()
-
+        
         # For RTO/failed deliveries, check if first attempt was AFTER EDD date
         if status in ['RTO', 'Damage/Lost'] and pd.notna(first_attempt):
             return first_attempt.date() > effective_edd.date()
-
+        
         # For undelivered shipments with attempt, check if attempt was AFTER EDD date
         if pd.isna(delivered) and pd.notna(first_attempt):
             return first_attempt.date() > effective_edd.date()
-
+        
         # For shipments with no attempt made and we're past EDD date
         if pd.isna(first_attempt):
             return current_date.date() > effective_edd.date()
-
+        
         return False
-
-    print("🔍 Calculating TAT breaches (including missing EDDs)...")
+    
+    print("🔍 Calculating TAT breaches...")
     df['tat_breach'] = df.apply(calculate_tat_breach, axis=1)
     df['delivery_success'] = (df['tracking_status_group'] == 'Delivered').astype(int)
-
     
     # CORRECTED days calculation - starts from Day 1
     def calculate_days_after_tat_breach(row):
