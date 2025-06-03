@@ -66,8 +66,8 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
     
     # Load dataset with memory optimization
     df = read_large_csv_optimized(file_path)
-    if df is None:
-        return None, None, None 
+    if df is None or df.empty:
+        return None, None, None
     
     initial_total_records = len(df)
     
@@ -78,144 +78,119 @@ def calculate_comprehensive_delivery_analysis_corrected(file_path):
             df[col] = pd.to_datetime(df[col], errors='coerce')
     
     # Create enhanced EDD column 
-    df['effective_edd'] = df['final_courier_edd'].fillna(df['rapidshyp_edd'])
+    df['effective_edd'] = df['final_courier_edd'].combine_first(df['rapidshyp_edd'])
     
-    # Filter out rows where both EDDs are missing
+    # Flag missing EDD values instead of dropping
+    df['edd_missing'] = df['effective_edd'].isna()
+    print(f"\uD83D\uDD0D Found {df['edd_missing'].sum():,} records with missing EDD")
     
-    df = df.dropna(subset=['effective_edd'])
-    print(f"🔍 Filtered dataset: {len(df):,} records (removed {initial_total_records - len(df):,} records with missing EDD)")
+    # Get current date as date object
+    current_date = datetime.now().date()
     
-    # Memory cleanup
-    gc.collect()
+    # Convert datetime columns to date objects safely
+    df['effective_edd_date'] = df['effective_edd'].apply(
+        lambda x: x.date() if pd.notna(x) else None
+    )
+    df['first_attempt_date'] = df['first_attempt_date'].apply(
+        lambda x: x.date() if pd.notna(x) else None
+    )
     
-    # Get current date for undelivered shipments analysis
-    current_date = datetime.now()
+    # Vectorized TAT breach calculation
+    cond_missing_edd = df['edd_missing'] & df['first_attempt_date'].notna()
+    cond_attempt_after_edd = (
+        df['first_attempt_date'].notna() & 
+        df['effective_edd_date'].notna() & 
+        (df['first_attempt_date'] > df['effective_edd_date'])
+    )
+    cond_no_attempt = (
+        df['first_attempt_date'].isna() & 
+        df['effective_edd_date'].notna() & 
+        (current_date > df['effective_edd_date'])
+    )
     
-    # CORRECTED TAT breach calculation - only after EDD date, not on same date
-    def calculate_tat_breach(row):
-        effective_edd = row['effective_edd']
-        first_attempt = row['first_attempt_date']
-        delivered = row['delivered_date']
-        status = row['tracking_status_group']
-        
-        # For delivered shipments, check if delivered AFTER EDD date (not on same date)
-        if status == 'Delivered' and pd.notna(delivered):
-            return first_attempt.date() > effective_edd.date()
-        
-        # For RTO/failed deliveries, check if first attempt was AFTER EDD date
-        if status in ['RTO', 'Damage/Lost'] and pd.notna(first_attempt):
-            return first_attempt.date() > effective_edd.date()
-        
-        # For undelivered shipments with attempt, check if attempt was AFTER EDD date
-        if pd.isna(delivered) and pd.notna(first_attempt):
-            return first_attempt.date() > effective_edd.date()
-        
-        # For shipments with no attempt made and we're past EDD date
-        if pd.isna(first_attempt):
-            return current_date.date() > effective_edd.date()
-        
-        return False
+    df['tat_breach'] = cond_missing_edd | cond_attempt_after_edd | cond_no_attempt
     
-    print("🔍 Calculating TAT breaches...")
-    df['tat_breach'] = df.apply(calculate_tat_breach, axis=1)
+    # Calculate delivery success
     df['delivery_success'] = (df['tracking_status_group'] == 'Delivered').astype(int)
     
-    # CORRECTED days calculation - starts from Day 1
-    def calculate_days_after_tat_breach(row):
-        effective_edd = row['effective_edd']
-        delivered = row['delivered_date']
-        first_attempt = row['first_attempt_date']
-        status = row['tracking_status_group']
-        
-        # For delivered shipments, use delivered_date
-        if status == 'Delivered' and pd.notna(delivered):
-            days = (first_attempt.date() - effective_edd.date()).days
-            return max(1, days)  # Minimum Day 1
-        
-        # For RTO cases, use first_attempt_date
-        elif status == 'RTO' and pd.notna(first_attempt):
-            days = (first_attempt.date() - effective_edd.date()).days
-            return max(1, days)  # Minimum Day 1
-        
-        # For other failed deliveries with attempt, use first_attempt_date
-        elif status in ['Damage/Lost'] and pd.notna(first_attempt):
-            days = (first_attempt.date() - effective_edd.date()).days
-            return max(1, days)  # Minimum Day 1
-        
-        # For undelivered shipments with attempt, use first_attempt_date
-        elif pd.isna(delivered) and pd.notna(first_attempt):
-            days = (first_attempt.date() - effective_edd.date()).days
-            return max(1, days)  # Minimum Day 1
-        
-        # For undelivered shipments with no attempt, use current date
-        elif pd.isna(delivered) and pd.isna(first_attempt):
-            days = (current_date.date() - effective_edd.date()).days
-            return max(1, days)  # Minimum Day 1
-        
-        # Default fallback
-        else:
-            days = (current_date.date() - effective_edd.date()).days
-            return max(1, days)  # Minimum Day 1
+    # Filter only TAT breach cases for analysis
+    breach_df = df[df['tat_breach']].copy()
     
-    # Apply days calculation only for TAT breach cases
-    print("📅 Calculating days after TAT breach...")
-    df.loc[df['tat_breach'], 'days_after_tat_breach'] = df.loc[df['tat_breach']].apply(
+    # Categorize shipment status with error handling
+    def categorize_shipment_status(row):
+        try:
+            status = row['tracking_status_group']
+            if status == 'Delivered':
+                return 'Delivered'
+            elif status == 'RTO':
+                return 'RTO'
+            elif status == 'Damage/Lost':
+                return 'Damage/Lost'
+            elif status == 'Manifested':
+                return 'Undelivered'
+            else:
+                if pd.isna(row['delivered_date']):
+                    return 'Undelivered'
+                return 'Other'
+        except KeyError:
+            return 'Unknown'
+    
+    breach_df['shipment_category'] = breach_df.apply(categorize_shipment_status, axis=1)
+    
+    # Calculate days after TAT breach with NaT handling
+    def calculate_days_after_tat_breach(row):
+        try:
+            effective_edd = row['effective_edd_date']
+            first_attempt = row['first_attempt_date']
+            
+            if effective_edd is None:
+                return None  # Skip invalid entries
+                
+            if first_attempt is not None:
+                days = (first_attempt - effective_edd).days
+            else:
+                days = (current_date - effective_edd).days
+                
+            return max(1, days) if days is not None else None
+            
+        except TypeError:
+            return None
+
+    breach_df['days_after_tat_breach'] = breach_df.apply(
         calculate_days_after_tat_breach, axis=1
     )
     
-    # Categorize shipment status
-    def categorize_shipment_status(row):
-        status = row['tracking_status_group']
-        if status == 'Delivered':
-            return 'Delivered'
-        elif status == 'RTO':
-            return 'RTO'
-        elif status == 'Damage/Lost':
-            return 'Damage/Lost'
-        elif status == 'Manifested':
-            return 'Undelivered'
-        else:
-            if pd.isna(row['delivered_date']):
-                return 'Undelivered'
-            else:
-                return 'Other'
-    
-    df['shipment_category'] = df.apply(categorize_shipment_status, axis=1)
-    
-    # Filter only TAT breach cases
-    breach_df = df[df['tat_breach'] == True].copy()
-    print(f"⚠️  TAT breach cases: {len(breach_df):,} records")
-    
-    if len(breach_df) == 0:
-        print("❌ No TAT breach cases found in the dataset")
-        return None, None
-    
-    # Show RTO statistics
-    breach_rto_count = (breach_df['shipment_category'] == 'RTO').sum()
-    print(f"📊 RTO cases in TAT breach data: {breach_rto_count:,}")
-    print(f"📊 RTO percentage in TAT breach data: {(breach_rto_count/len(breach_df))*100:.2f}%")
-    
-    # Memory cleanup before analysis
-    del df
-    gc.collect()
+    # Clean invalid entries
+    breach_df = breach_df[breach_df['days_after_tat_breach'].notna()]
     
     # Calculate daywise statistics (starting from Day 1)
-    print("📊 Calculating daywise statistics...")
     daywise_stats = breach_df.groupby('days_after_tat_breach').agg(
         total_shipments=('delivery_success', 'count'),
         successful_deliveries=('delivery_success', 'sum'),
-        failed_deliveries=('delivery_success', lambda x: len(x) - sum(x)),
         delivered_count=('shipment_category', lambda x: sum(x == 'Delivered')),
         rto_count=('shipment_category', lambda x: sum(x == 'RTO')),
         damage_lost_count=('shipment_category', lambda x: sum(x == 'Damage/Lost')),
         undelivered_count=('shipment_category', lambda x: sum(x == 'Undelivered'))
     ).reset_index()
     
-    daywise_stats['delivery_percentage'] = (daywise_stats['successful_deliveries'] / daywise_stats['total_shipments']) * 100
-    daywise_stats['rto_rate'] = (daywise_stats['rto_count'] / daywise_stats['total_shipments']) * 100
+    # Calculate performance metrics with zero-division handling
+    daywise_stats['delivery_percentage'] = daywise_stats.apply(
+        lambda x: (x['successful_deliveries'] / x['total_shipments'] * 100) if x['total_shipments'] > 0 else 0,
+        axis=1
+    )
+    
+    daywise_stats['rto_rate'] = daywise_stats.apply(
+        lambda x: (x['rto_count'] / x['total_shipments'] * 100) if x['total_shipments'] > 0 else 0,
+        axis=1
+    )
+    
     daywise_stats['drop_in_delivery_percentage'] = daywise_stats['delivery_percentage'].diff()
     
+    # Memory cleanup
+    gc.collect()
+    
     return daywise_stats, breach_df, initial_total_records
+
 
 def calculate_payment_method_analysis(breach_df):
     """
